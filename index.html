@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Garaj</title>
+<link rel="manifest" href="data:application/json,{%22name%22:%22Garaj%22,%22display%22:%22standalone%22,%22background_color%22:%22%23111%22}">
+<meta name="theme-color" content="#111111">
+<style>
+  :root{--bg:#0f0f11;--card:#1a1a1d;--bd:#2b2b30;--fg:#f2f2f4;--mut:#8a8a92;--pri:#e11d48}
+  *{box-sizing:border-box}
+  body{margin:0 auto;background:var(--bg);color:var(--fg);font:14px/1.4 -apple-system,system-ui,sans-serif;padding:16px 14px 40px;max-width:480px}
+  h1{font-size:22px;margin:0;letter-spacing:-.03em}
+  .sub{font-size:11px;color:var(--mut);margin-top:2px}
+  .row{display:flex;gap:6px}
+  .stat{flex:1;background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:8px 9px}
+  .stat b{font-size:14px;display:block;margin-top:1px}
+  .lbl{font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
+  .scan{border:1.5px dashed var(--bd);border-radius:16px;padding:20px 14px;text-align:center;background:var(--card);margin:12px 0}
+  button{border:0;border-radius:9px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+  .pri{background:var(--pri);color:#fff;flex:1}
+  .sec{background:#26262b;color:var(--fg);flex:1}
+  .ghost{background:transparent;color:var(--mut);font-weight:400;font-size:11px;padding:6px}
+  input,select{width:100%;background:#101012;border:1px solid var(--bd);border-radius:8px;padding:9px 10px;color:var(--fg);font-size:13px;margin-bottom:6px;font-family:inherit}
+  .item{display:flex;gap:9px;align-items:center;background:var(--card);border:1px solid var(--bd);border-radius:11px;padding:10px;margin-bottom:6px}
+  .nm{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .meta{font-size:10px;color:var(--mut);font-family:ui-monospace,monospace;margin-top:2px}
+  .badge{font-size:9px;font-weight:700;padding:3px 6px;border-radius:5px;white-space:nowrap}
+  .x{background:none;border:0;color:var(--mut);font-size:17px;padding:2px 5px}
+  #msg{font-size:11px;color:var(--mut);min-height:14px;margin-top:8px}
+  #auth{max-width:320px;margin:60px auto}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+
+<div id="auth">
+  <h1>Garaj</h1>
+  <p class="sub">E-postana giriş bağlantısı gönderilir.</p>
+  <input id="email" type="email" placeholder="e-posta" autocomplete="email">
+  <button class="pri" style="width:100%" onclick="login()">Bağlantı gönder</button>
+  <div id="msg"></div>
+</div>
+
+<div id="app" class="hidden">
+  <div style="display:flex;justify-content:space-between;align-items:baseline">
+    <div><h1>Garaj</h1><div class="sub" id="sub">0 araç</div></div>
+    <button class="ghost" onclick="logout()">çıkış</button>
+  </div>
+
+  <div class="row" style="margin:10px 0">
+    <div class="stat"><span class="lbl">Değer</span><b id="vVal">—</b></div>
+    <div class="stat"><span class="lbl">Ödenen</span><b id="vPaid">—</b></div>
+    <div class="stat"><span class="lbl">Fark</span><b id="vDiff">—</b></div>
+  </div>
+
+  <div class="scan">
+    <div style="font-size:24px">◎</div>
+    <div style="font-weight:600;margin:6px 0 2px">Kartı tara</div>
+    <div class="sub" style="margin-bottom:10px">Kodu ve ismi okur</div>
+    <div class="row">
+      <button class="pri" onclick="cam.click()">Kamera</button>
+      <button class="sec" onclick="gal.click()">Galeri</button>
+    </div>
+    <button class="ghost" style="width:100%;margin-top:6px" onclick="toggleForm()">elle ekle</button>
+    <div id="msg2" style="font-size:10px;color:var(--mut);margin-top:6px"></div>
+  </div>
+
+  <div id="form" class="hidden" style="background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:11px;margin-bottom:10px">
+    <input id="fCode" placeholder="kod (JJM17)" autocapitalize="characters">
+    <input id="fName" placeholder="isim">
+    <div class="row" style="margin-bottom:6px">
+      <input id="fPaid" type="number" inputmode="decimal" placeholder="ödediğin ₺">
+      <input id="fVal" type="number" inputmode="decimal" placeholder="değeri ₺">
+    </div>
+    <select id="fRar">
+      <option value="mainline">mainline</option><option value="th">treasure hunt</option>
+      <option value="sth">super th</option><option value="chase">chase</option><option value="premium">premium</option>
+    </select>
+    <div class="row"><button class="pri" onclick="save()">Kaydet</button><button class="sec" style="flex:0;padding:11px 14px" onclick="toggleForm()">İptal</button></div>
+  </div>
+
+  <input id="q" placeholder="ara" oninput="paint()">
+  <div id="list"></div>
+</div>
+
+<input id="cam" type="file" accept="image/*" capture="environment" class="hidden">
+<input id="gal" type="file" accept="image/*" class="hidden">
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+<script>
+const db = supabase.createClient(
+  "https://cczusdudetcqshdzvchn.supabase.co",
+  "sb_publishable_XJnMlPrus-TcKhdyN_W0hQ_MPaY1vHw"
+);
+
+const RAR = {mainline:["","#8a8a92"],th:["TH","#d97706"],sth:["STH","#e11d48"],chase:["CHASE","#a855f7"],premium:["PREM","#0d9488"]};
+let rows = [], me = null;
+const tl = n => (n||0).toLocaleString("tr-TR") + " ₺";
+
+db.auth.onAuthStateChange((_e, s) => {
+  me = s?.user || null;
+  document.getElementById("auth").classList.toggle("hidden", !!me);
+  document.getElementById("app").classList.toggle("hidden", !me);
+  if (me) load();
+});
+
+async function login(){
+  const email = document.getElementById("email").value.trim();
+  if (!email) return;
+  const { error } = await db.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
+  document.getElementById("msg").textContent = error ? error.message : "Bağlantı gönderildi, e-postanı kontrol et.";
+}
+const logout = () => db.auth.signOut();
+
+async function load(){
+  const { data, error } = await db.from("garage").select("*").order("created_at", { ascending: false });
+  if (error) { document.getElementById("sub").textContent = error.message; return; }
+  rows = data || []; paint();
+}
+
+function toggleForm(){
+  const f = document.getElementById("form");
+  f.classList.toggle("hidden");
+  if (!f.classList.contains("hidden")) document.getElementById("fCode").focus();
+}
+
+async function save(){
+  const code = document.getElementById("fCode").value.trim().toUpperCase();
+  const name = document.getElementById("fName").value.trim();
+  if (!code && !name) return;
+  const dup = code && rows.find(r => r.toy_number === code);
+  const { error } = await db.from("garage").insert({
+    user_id: me.id, toy_number: code, name: name || code,
+    rarity: document.getElementById("fRar").value,
+    paid: +document.getElementById("fPaid").value || 0,
+    valuation: +document.getElementById("fVal").value || 0
+  });
+  document.getElementById("msg2").textContent = error ? error.message : (dup ? "zaten vardı" : "kaydedildi");
+  ["fCode","fName","fPaid","fVal"].forEach(i => document.getElementById(i).value = "");
+  document.getElementById("form").classList.add("hidden");
+  load();
+}
+
+async function del(id){
+  await db.from("garage").delete().eq("id", id);
+  rows = rows.filter(r => r.id !== id); paint();
+}
+
+function paint(){
+  const q = document.getElementById("q").value.toLowerCase();
+  const shown = rows.filter(r => !q || (r.name + " " + (r.toy_number||"")).toLowerCase().includes(q));
+  const tv = rows.reduce((s,r) => s + (+r.valuation||0), 0);
+  const tp = rows.reduce((s,r) => s + (+r.paid||0), 0);
+  document.getElementById("vVal").textContent = tv ? tl(tv) : "—";
+  document.getElementById("vPaid").textContent = tp ? tl(tp) : "—";
+  const d = document.getElementById("vDiff");
+  d.textContent = (tv||tp) ? ((tv-tp) >= 0 ? "+" : "") + tl(tv-tp) : "—";
+  d.style.color = tv-tp > 0 ? "#22c55e" : tv-tp < 0 ? "#e11d48" : "var(--fg)";
+  document.getElementById("sub").textContent = rows.length + " araç";
+  const el = document.getElementById("list");
+  if (!shown.length) { el.innerHTML = '<div style="text-align:center;color:var(--mut);font-size:11px;padding:18px 0">' + (rows.length ? "sonuç yok" : "henüz kayıt yok") + '</div>'; return; }
+  el.innerHTML = shown.map(r => {
+    const b = RAR[r.rar] || RAR.mainline;
+    return '<div class="item"><div style="flex:1;min-width:0">' +
+      '<div class="nm">' + esc(r.name) + '</div>' +
+      '<div class="meta">' + esc(r.toy_number || "—") + ' · ' + r.created_at.slice(0,10) + '</div>' +
+      ((r.paid||r.valuation) ? '<div class="meta">ödenen ' + tl(r.paid) + ' · değer ' + tl(r.valuation) + '</div>' : '') +
+      '</div>' + (b[0] ? '<span class="badge" style="background:' + b[1] + '22;color:' + b[1] + '">' + b[0] + '</span>' : '') +
+      '<button class="x" onclick="del(\'' + r.id + '\')">×</button></div>';
+  }).join("");
+}
+const esc = s => String(s).replace(/[<>&]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
+
+for (const id of ["cam","gal"]) document.getElementById(id).onchange = async e => {
+  const file = e.target.files[0]; if (!file) return;
+  document.getElementById("msg2").textContent = "okunuyor…";
+  try {
+    const { data } = await Tesseract.recognize(file, "eng", {
+      workerPath: "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js",
+      corePath: "https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.0",
+      langPath: "https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng/4.0.0_best_int",
+      logger: m => { if (m.status === "recognizing text") document.getElementById("msg2").textContent = "okunuyor %" + Math.round(m.progress*100); }
+    });
+    const raw = data.text.toUpperCase().replace(/[^A-Z0-9 '\-]/g," ").replace(/\s+/g," ");
+    document.getElementById("fCode").value = (raw.match(/\b[A-Z]{2,3} ?\d{2,4}\b/) || [""])[0].replace(/ /g,"");
+    const stop = ["HOT","WHEELS","MATCHBOX","MAINLINE","SERIES","PREMIUM","TREASURE","HUNT","SUPER","NEW","FOR"];
+    document.getElementById("fName").value = raw.split(/[^A-Z0-9'\-]+/).filter(w => w.length>2 && !stop.includes(w) && !/^[A-Z]{2,3}\d{2,4}$/.test(w)).slice(0,5).join(" ");
+    document.getElementById("fRar").value = /SUPER ?TREASURE|\bSTH\b/.test(raw) ? "sth" : /TREASURE HUNT|\bTH\b/.test(raw) ? "th" : "mainline";
+    document.getElementById("msg2").textContent = "okundu, kontrol et";
+    document.getElementById("form").classList.remove("hidden");
+    document.getElementById("fPaid").focus();
+  } catch (err) { document.getElementById("msg2").textContent = "okunamadı, elle gir"; document.getElementById("form").classList.remove("hidden"); }
+};
+</script>
+</body>
+</html>
